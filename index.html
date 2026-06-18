@@ -1685,8 +1685,8 @@ function dxfRenderStockCard(){
   const unitSuffix = document.getElementById('dxfStockUnitSuffix');
   const areaEl = document.getElementById('dxfStockArea');
   const yieldEl = document.getElementById('dxfYieldRate');
-  const unit = unitLabel(dxfDisplayUnit());
-  const d = UNIT_TO_MM[dxfDisplayUnit()] || 1;
+  const unit = unitLabel(dxfActiveUnit());
+  const d = UNIT_TO_MM[dxfActiveUnit()] || 1;
 
   if(!dxfHasDoc || dxfStockLongMM===null){
     card.classList.add('stock-disabled');
@@ -1722,7 +1722,7 @@ function dxfRenderStockCard(){
 function dxfSetStockFromInputs(){
   const longInput = document.getElementById('dxfStockLong');
   const shortInput = document.getElementById('dxfStockShort');
-  const d = UNIT_TO_MM[dxfDisplayUnit()] || 1;
+  const d = UNIT_TO_MM[dxfActiveUnit()] || 1;
   const lv = parseFloat(longInput.value), sv = parseFloat(shortInput.value);
   dxfStockLongMM = (isFinite(lv) && lv>=0) ? lv*d : 0;
   dxfStockShortMM = (isFinite(sv) && sv>=0) ? sv*d : 0;
