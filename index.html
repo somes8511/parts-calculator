@@ -414,21 +414,21 @@ canvas{display:block;cursor:crosshair;touch-action:none;background:#11151a;}
           <input type="file" id="dxfInput" accept=".dxf" hidden>
         </label>
         <span class="unit-pill" id="dxfUnitPill">単位：未検出</span>
-        <select id="dxfUnitOverride" title="単位が自動検出できない場合に指定">
-          <option value="">単位を自動検出</option>
-          <option value="mm">mm として扱う</option>
-          <option value="cm">cm として扱う</option>
-          <option value="m">m として扱う</option>
-          <option value="dm">dm として扱う</option>
-          <option value="inch">inch として扱う</option>
+        <select id="dxfUnitOverride" title="座標値の単位を指定（$INSUNITSが無いファイル用）">
+          <option value="">単位：自動推定</option>
+          <option value="mm">座標単位：mm</option>
+          <option value="cm">座標単位：cm</option>
+          <option value="m">座標単位：m</option>
+          <option value="dm">座標単位：dm</option>
+          <option value="inch">座標単位：inch</option>
         </select>
-        <select id="dxfDisplayUnit" title="面積・寸法の表示単位">
-          <option value="">表示：ファイル単位と同じ</option>
-          <option value="mm">表示：mm</option>
-          <option value="cm">表示：cm</option>
-          <option value="m">表示：m</option>
-          <option value="dm">表示：dm</option>
-          <option value="inch">表示：inch</option>
+        <select id="dxfDisplayUnit" title="面積・寸法の表示単位（変換のみ。精度は変わりません）">
+          <option value="">面積表示：座標単位のまま</option>
+          <option value="mm">面積表示：mm²</option>
+          <option value="cm">面積表示：cm²</option>
+          <option value="m">面積表示：m²</option>
+          <option value="dm">面積表示：dm²</option>
+          <option value="inch">面積表示：inch²</option>
         </select>
         <span class="sep"></span>
         <button class="tool-btn" id="dxfZoomOutBtn">
@@ -1712,6 +1712,26 @@ function dxfLoadFromText(text, filename){
     });
   });
   if(!isFinite(minX)){ flash('有効な座標が見つかりませんでした'); return; }
+
+  /* ---- coordinate-range heuristic for unitless files ($INSUNITS=0) ----
+     When the DXF has no unit declaration, guess from the span of coordinates.
+     Typical leathercraft patterns:
+       mm : 50–5000  (e.g. a 30cm piece → ~300 coords)
+       cm :  5–500
+       inch: 2–200
+     We check the larger span of X/Y and map it to the most likely unit. */
+  if(!dxfUnitDetected){
+    const span = Math.max(maxX-minX, maxY-minY);
+    let hint = null;
+    if(span >= 50 && span <= 9999)       hint = 'mm';   // 5cm–10m range in mm
+    else if(span > 9999 && span <= 99999) hint = 'mm';  // very large mm drawing
+    else if(span >= 5 && span < 50)       hint = 'cm';
+    else if(span >= 1 && span < 5)        hint = 'inch';
+    if(hint){
+      dxfUnitOverrideVal = hint;
+      document.getElementById('dxfUnitOverride').value = hint;
+    }
+  }
   const diag = Math.hypot(maxX-minX, maxY-minY) || 1;
   const tol = diag * 0.0005;
 
