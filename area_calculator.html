@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0d1117">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
 <title>実面積計算ツール</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap');
@@ -153,24 +156,44 @@ canvas{display:block;cursor:crosshair;touch-action:none;background:#11151a;}
 .area-main{font-size:13.5px;}
 .area-sub{font-size:10.5px;color:var(--muted);}
 
-.stock-card .stock-row{display:flex;align-items:flex-end;gap:10px;margin-bottom:10px;flex-wrap:wrap;}
-.stock-card .stock-field{display:flex;flex-direction:column;gap:4px;}
-.stock-card .stock-field span{font-size:11px;color:var(--muted);}
-.stock-card .stock-field input{
-  width:84px;background:var(--panel2);border:1px solid var(--border);border-radius:7px;color:var(--text);
-  padding:7px 8px;font-family:var(--mono);font-size:13.5px;
-}
-.stock-card .stock-field input:focus{outline:none;border-color:var(--cyan);}
-.stock-card .stock-unit-suffix{font-family:var(--mono);font-size:12.5px;color:var(--muted);padding-bottom:8px;}
-.stock-card .stock-reset{margin-bottom:10px;}
-.stock-card .stock-result{border-top:1px solid var(--border);padding-top:10px;display:flex;flex-direction:column;gap:6px;}
-.stock-card .stock-line{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--mono);font-size:12.5px;color:var(--muted);}
-.stock-card .stock-line b{color:var(--text);font-weight:400;}
-.yield-value{font-size:20px;font-weight:700;font-family:var(--mono);color:var(--cyan);}
-.yield-value.good{color:var(--lime);}
-.yield-value.warn{color:var(--amber);}
-.yield-value.over{color:var(--danger);}
 .stock-disabled{opacity:0.45;pointer-events:none;}
+
+.focus-btn{
+  margin-left:auto;background:none;border:1px solid var(--border);border-radius:5px;
+  color:var(--muted);font-size:13px;padding:2px 6px;cursor:pointer;flex-shrink:0;
+  line-height:1.2;transition:color .15s,border-color .15s;
+}
+.focus-btn:hover{color:var(--cyan);border-color:var(--cyan);}
+.focus-btn.active{color:var(--cyan);border-color:var(--cyan);background:rgba(0,230,220,0.08);}
+.dxf-row.focused-part{
+  border-color:var(--cyan) !important;
+  background:rgba(0,230,220,0.05) !important;
+}
+
+/* per-part inline yield section */
+.part-yield{
+  margin-top:8px;padding:8px 10px;border-radius:7px;
+  background:rgba(255,255,255,0.03);border:1px solid var(--border);
+}
+.part-yield-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px;}
+.part-yield-row span{font-size:11px;color:var(--muted);}
+.part-yield-row input[type=number]{
+  width:74px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;
+  color:var(--text);padding:4px 6px;font-family:var(--mono);font-size:12.5px;
+}
+.part-yield-row input[type=number]:focus{outline:none;border-color:var(--cyan);}
+.part-yield-row .stock-unit{font-size:11px;color:var(--muted);margin-right:4px;}
+.part-yield-row .reset-btn{
+  font-size:10.5px;color:var(--muted);background:none;border:1px solid var(--border);
+  border-radius:5px;padding:2px 6px;cursor:pointer;white-space:nowrap;
+}
+.part-yield-row .reset-btn:hover{color:var(--text);border-color:#3a4452;}
+.part-yield-result{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:4px;}
+.part-yield-result .stock-area-text{font-size:11.5px;color:var(--muted);font-family:var(--mono);}
+.part-yield-rate{font-size:17px;font-weight:700;font-family:var(--mono);color:var(--cyan);}
+.part-yield-rate.good{color:var(--lime);}
+.part-yield-rate.warn{color:var(--amber);}
+.part-yield-rate.over{color:var(--danger);}
 
 .unit-pill{
   font-family:var(--mono);font-size:12px;color:var(--muted);
@@ -439,11 +462,12 @@ canvas{display:block;cursor:crosshair;touch-action:none;background:#11151a;}
         <div class="total-sub" id="dxfTotalSub"></div>
       </div>
       <div class="card stock-card" id="dxfStockCard">
-        <h2>原反サイズ / 歩留率</h2>
+        <h2 id="dxfStockTitle">原反サイズ / 歩留率</h2>
+        <button class="ghost-btn small stock-reset" id="dxfStockAllBtn" style="display:none">← 全パーツに戻す</button>
         <div class="stock-row">
           <label class="stock-field"><span>長辺</span><input type="number" id="dxfStockLong" step="any" min="0"></label>
           <label class="stock-field"><span>短辺</span><input type="number" id="dxfStockShort" step="any" min="0"></label>
-          <span class="stock-unit-suffix" id="dxfStockUnitSuffix">cm</span>
+          <span class="stock-unit-suffix" id="dxfStockUnitSuffix">mm</span>
         </div>
         <button class="ghost-btn small stock-reset" id="dxfStockResetBtn">図形全体のサイズから再取得</button>
         <div class="stock-result">
@@ -1211,6 +1235,66 @@ function sampleEllipse(cx,cy,mx,my,ratio,startParam,endParam){
   return pts;
 }
 
+/* ---- true B-spline (NURBS) curve evaluation, De Boor's algorithm ----
+   Used for SPLINE entities so the rendered/measured curve matches the
+   actual mathematical curve, instead of crudely connecting raw control
+   points (which are usually NOT on the curve and can badly distort area). */
+function bsplineFindSpan(n, p, t, U){
+  if(t >= U[n+1]) return n;
+  if(t <= U[p]) return p;
+  let low=p, high=n+1, mid=Math.floor((low+high)/2);
+  while(t < U[mid] || t >= U[mid+1]){
+    if(t < U[mid]) high=mid; else low=mid;
+    mid=Math.floor((low+high)/2);
+  }
+  return mid;
+}
+
+function bsplineEvalPoint(p, U, ctrl, weights, t){
+  const n = ctrl.length-1;
+  const k = bsplineFindSpan(n, p, t, U);
+  const d = [];
+  for(let j=0;j<=p;j++){
+    const idx = k-p+j;
+    const w = weights ? weights[idx] : 1;
+    d.push({x:ctrl[idx].x*w, y:ctrl[idx].y*w, w});
+  }
+  for(let r=1;r<=p;r++){
+    for(let j=p;j>=r;j--){
+      const i = k-p+j;
+      const denom = U[i+p-r+1]-U[i];
+      const alpha = denom!==0 ? (t-U[i])/denom : 0;
+      d[j] = {
+        x:(1-alpha)*d[j-1].x + alpha*d[j].x,
+        y:(1-alpha)*d[j-1].y + alpha*d[j].y,
+        w:(1-alpha)*d[j-1].w + alpha*d[j].w
+      };
+    }
+  }
+  const res = d[p];
+  return { x: res.x/res.w, y: res.y/res.w };
+}
+
+/* sample a clamped/open B-spline curve given degree, full knot vector, control points (+ optional weights) */
+function sampleBSpline(degree, knots, ctrl, weights){
+  const n = ctrl.length-1;
+  if(degree<1 || ctrl.length < degree+1 || knots.length !== n+degree+2) return null; // malformed, caller should fall back
+  const tStart = knots[degree], tEnd = knots[n+1];
+  if(!(tEnd>tStart)) return null;
+  // count distinct interior knot spans to scale sampling density with curve complexity
+  let spans = 0;
+  for(let i=degree;i<n+1;i++){ if(knots[i+1]>knots[i]) spans++; }
+  spans = Math.max(1, spans);
+  const samplesPerSpan = 48;
+  const total = spans*samplesPerSpan;
+  const pts = [];
+  for(let i=0;i<=total;i++){
+    const t = tStart + (tEnd-tStart)*i/total;
+    pts.push(bsplineEvalPoint(degree, knots, ctrl, weights, Math.min(t,tEnd)));
+  }
+  return pts;
+}
+
 function readEntityRaw(tokens, i){
   const type = tokens[i].value;
   i++;
@@ -1223,6 +1307,7 @@ function readEntityRaw(tokens, i){
 }
 
 function num(v){ return parseFloat(v); }
+
 
 function buildEntity(type, seq){
   const ent = { type, layer:'0', closed:false, points:[] };
@@ -1362,19 +1447,29 @@ function parseDXF(text){
               const expanded = expandVertexChain(verts, closedFlag);
               entities.push({ type:'POLYLINE', layer, points:expanded.points, closed:expanded.closed });
             } else if(r.type === 'SPLINE'){
-              let layer='0', flags=0;
-              const ctrl=[]; const fit=[];
+              let layer='0', flags=0, degree=3;
+              const ctrl=[]; const fit=[]; const knots=[]; const weights=[];
               for(const t of r.seq){
                 if(t.code===8) layer=t.value;
                 else if(t.code===70) flags=parseInt(t.value,10)||0;
+                else if(t.code===71) degree=parseInt(t.value,10)||3;
+                else if(t.code===40) knots.push(num(t.value));
+                else if(t.code===41) weights.push(num(t.value));
                 else if(t.code===10) ctrl.push({x:num(t.value),y:0});
                 else if(t.code===20){ if(ctrl.length) ctrl[ctrl.length-1].y = num(t.value); }
                 else if(t.code===11) fit.push({x:num(t.value),y:0});
                 else if(t.code===21){ if(fit.length) fit[fit.length-1].y = num(t.value); }
               }
-              const pts = fit.length>=2 ? fit : ctrl;
               const closedFlag = !!(flags & 1);
-              entities.push({ type:'SPLINE', layer, points:pts, closed:closedFlag, approx:true });
+              const hasWeights = weights.length === ctrl.length && weights.some(function(w){return w!==1;});
+              let pts = ctrl.length>=2 ? sampleBSpline(degree, knots, ctrl, hasWeights?weights:null) : null;
+              let approx = false;
+              if(!pts){
+                /* malformed/insufficient B-spline definition: fall back to best available approximation */
+                pts = fit.length>=2 ? fit : ctrl;
+                approx = true;
+              }
+              entities.push({ type:'SPLINE', layer, points:pts, closed:closedFlag, approx });
             } else {
               const ent = buildEntity(r.type, r.seq);
               if(ent) entities.push(ent);
@@ -1523,6 +1618,18 @@ let dxfDisplayUnitVal = '';
 let dxfStockLongMM = null;
 let dxfStockShortMM = null;
 let dxfLastGrandTotalRaw = 0;
+let dxfFocusedPartIdx = null; /* null = all-parts mode, number = index into dxfParts */
+
+function dxfPartBBox(part){
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  part.memberIdxs.forEach(function(idx){
+    dxfLoops[idx].points.forEach(function(p){
+      if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x;
+      if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y;
+    });
+  });
+  return {minX,minY,maxX,maxY};
+}
 
 function dxfActiveUnit(){ return dxfUnitOverrideVal || dxfUnitDetected || 'mm'; }
 function dxfUnitIsGuess(){ return !dxfUnitOverrideVal && !dxfUnitDetected; }
@@ -1621,6 +1728,18 @@ function dxfLoadFromText(text, filename){
   dxfParts = dxfBuildParts(dxfLoops);
   dxfParts.forEach(function(part, idx){
     dxfLoops[part.rootIdx].name = 'パーツ ' + (idx+1);
+    /* compute per-part bounding box from all member loops' points */
+    let px1=Infinity,py1=Infinity,px2=-Infinity,py2=-Infinity;
+    part.memberIdxs.forEach(function(mi){
+      dxfLoops[mi].points.forEach(function(p){
+        if(p.x<px1)px1=p.x; if(p.x>px2)px2=p.x;
+        if(p.y<py1)py1=p.y; if(p.y>py2)py2=p.y;
+      });
+    });
+    const toMM = UNIT_TO_MM[dxfActiveUnit()] || 1;
+    const wMM = (px2-px1)*toMM, hMM = (py2-py1)*toMM;
+    part.stockLongMM = Math.max(wMM, hMM);
+    part.stockShortMM = Math.min(wMM, hMM);
   });
   dxfBBox = {minX,minY,maxX,maxY};
   dxfStockAutoFromBBox();
@@ -1669,9 +1788,12 @@ document.getElementById('dxfDisplayUnit').addEventListener('change', function(e)
 
 /* ---- stock size (原反) / yield rate (歩留率) ---- */
 function dxfStockAutoFromBBox(){
-  if(!dxfBBox) return;
-  const wSrc = dxfBBox.maxX - dxfBBox.minX;
-  const hSrc = dxfBBox.maxY - dxfBBox.minY;
+  const bbox = (dxfFocusedPartIdx !== null && dxfParts[dxfFocusedPartIdx])
+    ? dxfPartBBox(dxfParts[dxfFocusedPartIdx])
+    : dxfBBox;
+  if(!bbox) return;
+  const wSrc = bbox.maxX - bbox.minX;
+  const hSrc = bbox.maxY - bbox.minY;
   const toMM = UNIT_TO_MM[dxfActiveUnit()] || 1;
   const wMM = wSrc*toMM, hMM = hSrc*toMM;
   dxfStockLongMM = Math.max(wMM, hMM);
@@ -1685,8 +1807,20 @@ function dxfRenderStockCard(){
   const unitSuffix = document.getElementById('dxfStockUnitSuffix');
   const areaEl = document.getElementById('dxfStockArea');
   const yieldEl = document.getElementById('dxfYieldRate');
-  const unit = unitLabel(dxfDisplayUnit());
-  const d = UNIT_TO_MM[dxfDisplayUnit()] || 1;
+  const titleEl = document.getElementById('dxfStockTitle');
+  const unit = unitLabel(dxfActiveUnit());
+  const d = UNIT_TO_MM[dxfActiveUnit()] || 1;
+
+  /* focused part label */
+  const focused = dxfFocusedPartIdx !== null && dxfParts[dxfFocusedPartIdx];
+  if(titleEl){
+    if(focused){
+      const root = dxfLoops[dxfParts[dxfFocusedPartIdx].rootIdx];
+      titleEl.textContent = '原反・歩留率：' + (root.name || 'パーツ');
+    } else {
+      titleEl.textContent = '原反サイズ / 歩留率';
+    }
+  }
 
   if(!dxfHasDoc || dxfStockLongMM===null){
     card.classList.add('stock-disabled');
@@ -1707,14 +1841,23 @@ function dxfRenderStockCard(){
   areaEl.textContent = (stockAreaMM2>0 ? formatNum(stockAreaDisplay) : '—') + ' ' + unit + '²';
 
   const sToMM = UNIT_TO_MM[dxfActiveUnit()] || 1;
-  const grandTotalMM2 = dxfLastGrandTotalRaw * sToMM * sToMM;
+  /* use focused part area if in single-part mode, otherwise grand total */
+  let targetAreaRaw;
+  if(focused){
+    const part = dxfParts[dxfFocusedPartIdx];
+    const root = dxfLoops[part.rootIdx];
+    targetAreaRaw = dxfNetAreaForPart(part) * root.qty;
+  } else {
+    targetAreaRaw = dxfLastGrandTotalRaw;
+  }
+  const targetAreaMM2 = targetAreaRaw * sToMM * sToMM;
 
   if(!(stockAreaMM2>0)){
     yieldEl.textContent = '原反サイズを入力してください';
     yieldEl.className = 'yield-value';
     return;
   }
-  const rate = (grandTotalMM2 / stockAreaMM2) * 100;
+  const rate = (targetAreaMM2 / stockAreaMM2) * 100;
   yieldEl.textContent = formatNum(rate) + '%';
   yieldEl.className = 'yield-value' + (rate>100 ? ' over' : rate>=80 ? ' good' : rate>=40 ? '' : ' warn');
 }
@@ -1722,7 +1865,7 @@ function dxfRenderStockCard(){
 function dxfSetStockFromInputs(){
   const longInput = document.getElementById('dxfStockLong');
   const shortInput = document.getElementById('dxfStockShort');
-  const d = UNIT_TO_MM[dxfDisplayUnit()] || 1;
+  const d = UNIT_TO_MM[dxfActiveUnit()] || 1;
   const lv = parseFloat(longInput.value), sv = parseFloat(shortInput.value);
   dxfStockLongMM = (isFinite(lv) && lv>=0) ? lv*d : 0;
   dxfStockShortMM = (isFinite(sv) && sv>=0) ? sv*d : 0;
@@ -1734,7 +1877,30 @@ document.getElementById('dxfStockShort').addEventListener('input', dxfSetStockFr
 document.getElementById('dxfStockResetBtn').addEventListener('click', function(){
   dxfStockAutoFromBBox();
   dxfRenderStockCard();
-  flash('図形全体のサイズから原反サイズを再取得しました');
+  flash('外形サイズから原反サイズを再取得しました');
+});
+document.getElementById('dxfStockAllBtn').addEventListener('click', function(){
+  dxfFocusedPartIdx = null;
+  dxfStockAutoFromBBox();
+  document.getElementById('dxfStockAllBtn').style.display = 'none';
+  dxfRenderPartList();
+});
+
+/* focus button on part rows */
+dxfPartListEl.addEventListener('click', function(e){
+  const fb = e.target.closest('.focus-btn');
+  if(!fb) return;
+  const pidx = parseInt(fb.dataset.pidx, 10);
+  if(dxfFocusedPartIdx === pidx){
+    dxfFocusedPartIdx = null;
+    dxfStockAutoFromBBox();
+    document.getElementById('dxfStockAllBtn').style.display = 'none';
+  } else {
+    dxfFocusedPartIdx = pidx;
+    dxfStockAutoFromBBox();
+    document.getElementById('dxfStockAllBtn').style.display = '';
+  }
+  dxfRenderPartList();
 });
 
 /* ---- layer chips ---- */
@@ -1788,6 +1954,8 @@ function dxfRenderPartList(){
   let grandTotal = 0;
   const unit = unitLabel(dxfDisplayUnit());
   const f = dxfAreaConvFactor();
+  const activeUnit = dxfActiveUnit();
+  const sToMM = UNIT_TO_MM[activeUnit] || 1;
 
   dxfParts.forEach(function(part){
     const root = dxfLoops[part.rootIdx];
@@ -1803,10 +1971,44 @@ function dxfRenderPartList(){
     const subText = (root.mode!=='off' && root.qty>1) ? ('1枚: ' + formatNum(perUnit*f) + ' ' + unit + '²') : '';
     const warnHtml = root.openWarning ? '<span class="warn-badge">未閉合</span>' : '';
 
+    /* per-part yield calculation */
+    const stockAreaMM2 = (part.stockLongMM||0) * (part.stockShortMM||0);
+    const partNetMM2 = sub * sToMM * sToMM;
+    let yieldRate = (stockAreaMM2 > 0) ? partNetMM2 / stockAreaMM2 * 100 : null;
+    let yieldClass = 'part-yield-rate';
+    if(yieldRate !== null){
+      if(yieldRate > 100) yieldClass += ' over';
+      else if(yieldRate >= 80) yieldClass += ' good';
+      else if(yieldRate < 40) yieldClass += ' warn';
+    }
+    const d = UNIT_TO_MM[activeUnit] || 1;
+    const stockLongDisp = (part.stockLongMM||0) / d;
+    const stockShortDisp = (part.stockShortMM||0) / d;
+    const stockAreaDisp = stockAreaMM2 / (d*d);
+
+    const yieldHtml = (root.mode==='off') ? '' :
+      '<div class="part-yield" data-part-id="' + part.rootIdx + '">' +
+        '<div class="part-yield-row">' +
+          '<span>原反</span>' +
+          '<input class="part-stock-long" type="number" step="any" min="0" value="' + formatNum(stockLongDisp) + '" data-pidx="' + part.rootIdx + '">' +
+          '<span>×</span>' +
+          '<input class="part-stock-short" type="number" step="any" min="0" value="' + formatNum(stockShortDisp) + '" data-pidx="' + part.rootIdx + '">' +
+          '<span class="stock-unit">' + escapeHtml(activeUnit) + '</span>' +
+          '<button class="reset-btn" data-pidx="' + part.rootIdx + '">自動</button>' +
+        '</div>' +
+        '<div class="part-yield-result">' +
+          '<span class="stock-area-text">原反面積 ' + (stockAreaMM2>0 ? formatNum(stockAreaDisp)+' '+escapeHtml(activeUnit)+'²' : '—') + '</span>' +
+          '<span class="' + yieldClass + '">' + (yieldRate!==null ? formatNum(yieldRate)+'%' : '—') + '</span>' +
+        '</div>' +
+      '</div>';
+
+    const isFocused = dxfFocusedPartIdx === dxfParts.indexOf(part);
+    row.className = 'shape-row dxf-row' + (isFocused ? ' focused-part' : '');
     row.innerHTML =
       '<div class="shape-row-top">' +
         '<input class="shape-name" value="' + escapeHtml(root.name) + '" data-id="' + root.id + '">' +
         warnHtml +
+        '<button class="focus-btn' + (isFocused?' active':'') + '" data-pidx="' + dxfParts.indexOf(part) + '" title="このパーツ単体で歩留率を計算">' + (isFocused?'◉':'◎') + '</button>' +
       '</div>' +
       '<div class="shape-meta">' +
         '<div class="shape-qty">' +
@@ -1819,7 +2021,8 @@ function dxfRenderPartList(){
           '<button class="mode-btn' + (root.mode==='off'?' active off':'') + '" data-mode="off">除外</button>' +
         '</div>' +
         '<div class="shape-area"><div class="area-main">' + mainText + '</div>' + (subText?'<div class="area-sub">'+subText+'</div>':'') + '</div>' +
-      '</div>';
+      '</div>' +
+      yieldHtml;
 
     dxfPartListEl.appendChild(row);
 
@@ -1847,8 +2050,6 @@ function dxfRenderPartList(){
     });
   });
 
-  dxfLastGrandTotalRaw = grandTotal;
-
   document.getElementById('dxfShapeCount').textContent = dxfParts.length ? '(' + dxfParts.length + ')' : '';
   document.getElementById('dxfEmptyHint').style.display = dxfParts.length ? 'none' : 'block';
 
@@ -1861,7 +2062,6 @@ function dxfRenderPartList(){
     totalEl.textContent = formatNum(grandTotal*f) + ' ' + unit + '²';
     totalSubEl.textContent = dxfParts.length + ' パーツ（枚数込み）';
   }
-  dxfRenderStockCard();
   dxfScheduleRender();
 }
 
@@ -2019,6 +2219,13 @@ dxfRender();
 window.addEventListener('resize', function(){ /* keep zoom stable on resize */ });
 
 })();
+</script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('./sw.js').catch(function(){});
+  });
+}
 </script>
 </body>
 </html>
