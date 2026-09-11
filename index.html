@@ -1891,23 +1891,6 @@ document.getElementById('dxfStockAllBtn').addEventListener('click', function(){
   dxfRenderPartList();
 });
 
-/* focus button on part rows */
-dxfPartListEl.addEventListener('click', function(e){
-  const fb = e.target.closest('.focus-btn');
-  if(!fb) return;
-  const pidx = parseInt(fb.dataset.pidx, 10);
-  if(dxfFocusedPartIdx === pidx){
-    dxfFocusedPartIdx = null;
-    dxfStockAutoFromBBox();
-    document.getElementById('dxfStockAllBtn').style.display = 'none';
-  } else {
-    dxfFocusedPartIdx = pidx;
-    dxfStockAutoFromBBox();
-    document.getElementById('dxfStockAllBtn').style.display = '';
-  }
-  dxfRenderPartList();
-});
-
 /* ---- layer chips ---- */
 function dxfRenderLayerChips(){
   const row = document.getElementById('dxfLayerRow');
@@ -2096,6 +2079,20 @@ dxfPartListEl.addEventListener('click', function(e){
       l.mode = modeBtn.dataset.mode;
       dxfRenderPartList();
     }
+  }
+  const focusBtn = e.target.closest('.focus-btn');
+  if(focusBtn){
+    const pidx = parseInt(focusBtn.dataset.pidx, 10);
+    if(dxfFocusedPartIdx === pidx){
+      dxfFocusedPartIdx = null;
+      dxfStockAutoFromBBox();
+      document.getElementById('dxfStockAllBtn').style.display = 'none';
+    } else {
+      dxfFocusedPartIdx = pidx;
+      dxfStockAutoFromBBox();
+      document.getElementById('dxfStockAllBtn').style.display = '';
+    }
+    dxfRenderPartList();
   }
 });
 
