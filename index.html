@@ -1154,9 +1154,11 @@ function tokenizeDXF(text){
   const tokens = [];
   for(let i=0; i+1<lines.length; i+=2){
     const codeStr = lines[i].trim();
-    if(codeStr === '' && i+1>=lines.length) break;
+    if(codeStr === '') continue;
     const code = parseInt(codeStr,10);
+    if(isNaN(code)) continue;          /* skip malformed lines */
     const value = lines[i+1].trim();
+    if(code === 999) continue;          /* skip comment group (code 999) */
     tokens.push({code, value});
   }
   return tokens;
@@ -1679,13 +1681,16 @@ dxfInputEl.addEventListener('change', function(e){
   const reader = new FileReader();
   reader.onload = function(ev){
     try{
-      dxfLoadFromText(ev.target.result, file.name);
+      /* Use TextDecoder to strip UTF-8 BOM (EF BB BF) automatically */
+      const bytes = new Uint8Array(ev.target.result);
+      const text = new TextDecoder('utf-8').decode(bytes).replace(/^\uFEFF/,'');
+      dxfLoadFromText(text, file.name);
     }catch(err){
       flash('DXFの読み込みに失敗しました：' + err.message);
     }
   };
   reader.onerror = function(){ flash('ファイルを読み込めませんでした'); };
-  reader.readAsText(file);
+  reader.readAsArrayBuffer(file);
   dxfInputEl.value = '';
 });
 
